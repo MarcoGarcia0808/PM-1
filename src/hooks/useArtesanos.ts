@@ -1,27 +1,38 @@
 // src/hooks/useArtesanos.ts
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   obtenerArtesanos,
   obtenerArtesanoPorId,
   obtenerProductosPorArtesano,
-} from '../services/artesaniaService';
+} from '../repositorios/ArtesanoRepositorio';
 import { Artesano, Producto } from '../types/index';
 
 // Hook para la LISTA de artesanos
 export function useArtesanos() {
   const [artesanos, setArtesanos] = useState<Artesano[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const cargarArtesanos = useCallback(() => {
     let activo = true;
     (async () => {
-      const datos = await obtenerArtesanos();
-      if (activo) { setArtesanos(datos); setCargando(false); }
+      try {
+        setCargando(true);
+        setError(null);
+        const datos = await obtenerArtesanos();
+        if (activo) setArtesanos(datos);
+      } catch (err) {
+        if (activo) setError(err instanceof Error ? err.message : 'Error al cargar artesanos');
+      } finally {
+        if (activo) setCargando(false);
+      }
     })();
     return () => { activo = false; };
   }, []);
 
-  return { artesanos, cargando };
+  useEffect(() => cargarArtesanos(), [cargarArtesanos]);
+
+  return { artesanos, cargando, error, recargar: cargarArtesanos };
 }
 
 // Hook para UN artesano + sus productos en subasta
@@ -29,18 +40,29 @@ export function useArtesano(id: number) {
   const [artesano, setArtesano] = useState<Artesano | null>(null);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const cargarArtesano = useCallback(() => {
     let activo = true;
     (async () => {
-      const [a, p] = await Promise.all([
-        obtenerArtesanoPorId(id),
-        obtenerProductosPorArtesano(id),
-      ]);
-      if (activo) { setArtesano(a); setProductos(p); setCargando(false); }
+      try {
+        setCargando(true);
+        setError(null);
+        const [a, p] = await Promise.all([
+          obtenerArtesanoPorId(id),
+          obtenerProductosPorArtesano(id),
+        ]);
+        if (activo) { setArtesano(a); setProductos(p); }
+      } catch (err) {
+        if (activo) setError(err instanceof Error ? err.message : 'Error al cargar artesano');
+      } finally {
+        if (activo) setCargando(false);
+      }
     })();
     return () => { activo = false; };
   }, [id]);
 
-  return { artesano, productos, cargando };
+  useEffect(() => cargarArtesano(), [cargarArtesano]);
+
+  return { artesano, productos, cargando, error, recargar: cargarArtesano };
 }
